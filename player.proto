@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+// 定义玩家信息
+message Player {
+    int32 id = 1;                 // 玩家ID
+    string name = 2;              // 玩家名字
+    int32 score = 3;              // 玩家分数
+}

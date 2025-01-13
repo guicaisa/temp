@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+enum MSG_TYPE {
+  ID_NONE = 0;
+  ID_C2L_EnterWorld = 1;
+  ID_L2C_EnterWorld = 2;
+  ID_L2C_NotifyEnterWorld = 3;
+  ID_C2L_Move = 4;
+  ID_L2C_Move = 5;
+  ID_L2C_NotifyMove = 6;
+  ID_C2L_StopMove = 7;
+  ID_L2C_StopMove = 8;
+  ID_L2C_NotifyStopMove = 9;
+}
+
+message Vector3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+//进入世界
+message C2L_EnterWorld {
+  uint64 uid = 1;
+  Vector3 pos = 2;
+}
+
+message L2C_EnterWorld {
+  uint32 ret = 1;
+  uint64 uid = 2;
+  Vector3 pos = 3;
+}
+
+//通知其他玩家进入世界
+message L2C_NotifyEnterWorld {
+  uint32 ret = 1;
+  uint64 uid = 2;
+  Vector3 pos = 3;
+}
+
+//移动
+message C2L_Move {
+  uint64 uid = 1;
+  Vector3 direction = 2;
+  float speed = 3;
+}
+
+message L2C_Move {
+  uint32 ret = 1;
+  uint64 uid = 2;
+  Vector3 direction = 3;
+  float speed = 4;
+}
+
+//通知其他玩家移动
+message L2C_NotifyMove {
+  uint32 ret = 1;
+  uint64 uid = 2;
+  Vector3 direction = 3;
+  float speed = 4;
+}
+
+//停止移动
+message C2L_StopMove {
+  uint64 uid = 1;
+}
+
+message L2C_StopMove {
+  uint32 ret = 1;
+  uint64 uid = 2;
+}
+
+//通知其他玩家停止移动
+message L2C_NotifyStopMove {
+  uint32 ret = 1;
+  uint64 uid = 2;
+}
