@@ -3,91 +3,12 @@
 #include <vector>
 #include "player.pb.h"
 #include "cl.pb.h"
+#include "message.h"
 
 using boost::asio::ip::tcp;
 
-class Message
-{
-public:
-    char *Convert2Bytes()
-    {
-        char *buf = new char(Message::package_head_size + length_);
-        char c1 = length_ >> 24;
-        char c2 = length_ >> 16;
-        char c3 = length_ >> 8;
-        char c4 = length_;
-        buf[0] = c1;
-        buf[1] = c2;
-        buf[2] = c3;
-        buf[3] = c4;
-
-        c1 = msg_type_ >> 24;
-        c2 = msg_type_ >> 16;
-        c3 = msg_type_ >> 8;
-        c4 = msg_type_;
-        buf[4] = c1;
-        buf[5] = c2;
-        buf[6] = c3;
-        buf[7] = c4;
-
-        c1 = sequence_ >> 24;
-        c2 = sequence_ >> 16;
-        c3 = sequence_ >> 8;
-        c4 = sequence_;
-        buf[8] = c1;
-        buf[9] = c2;
-        buf[10] = c3;
-        buf[11] = c4;
-
-        c1 = flags_ >> 24;
-        c2 = flags_ >> 16;
-        c3 = flags_ >> 8;
-        c4 = flags_;
-        buf[12] = c1;
-        buf[13] = c2;
-        buf[14] = c3;
-        buf[15] = c4;
-
-        c1 = reserved_ >> 24;
-        c2 = reserved_ >> 16;
-        c3 = reserved_ >> 8;
-        c4 = reserved_;
-        buf[16] = c1;
-        buf[17] = c2;
-        buf[18] = c3;
-        buf[19] = c4;
-
-        for (int i = 0; i < body_.size(); ++i)
-        {
-            buf[20+i] = body_[i];
-        }
-        return buf;
-    }
-
-    char* BodyToBytes()
-    {
-        char* data = new char(body_.size());
-        for (int i = 0; i < body_.size(); ++i)
-        {
-            data[i] = body_[i];
-        }
-        return data;
-    }
-
-public:
-    static const uint32_t package_head_size = 20;
-
-    uint32_t length_;
-    uint32_t msg_type_;
-    uint32_t sequence_;
-    uint32_t flags_;
-    uint32_t reserved_;
-
-    std::vector<char> body_;
-};
-
 class Server;
-void tempfunc(Server *server, char* data, int length);
+void tempfunc(Server *server, const std::string& str);
 
 
 class Session : public std::enable_shared_from_this<Session>
@@ -109,6 +30,7 @@ public:
                                 {
                                     if (!ec)
                                     {
+                                        printf("read: %d\n", length);
                                         //do_write(length);
                                         cacheReadDatas(length);
                                         do_read();
@@ -128,19 +50,19 @@ public:
                                  });
     }
 
-    void response(uint32_t msgType, char*data, int length)
+    void response(uint32_t msgType, const std::string& str)
     {
         Message rspMsg;
-        rspMsg.length_ = length + Message::package_head_size;
+        rspMsg.length_ = str.size() + Message::package_head_size;
         rspMsg.msg_type_ = msgType;
-        for (int i = 0; i < length; ++i)
+        for (int i = 0; i < str.size(); ++i)
         {
-            rspMsg.body_.push_back(data[i]);
+            rspMsg.body_.push_back(str[i]);
         }
-        char* bytes = rspMsg.Convert2Bytes();
+        std::string sendStr = rspMsg.Convert2Str();
 
         auto self(shared_from_this());
-        boost::asio::async_write(socket_, boost::asio::buffer(bytes, rspMsg.length_),
+        boost::asio::async_write(socket_, boost::asio::buffer(sendStr.c_str(), sendStr.size()),
                                  [this, self](boost::system::error_code ec, std::size_t /*length*/)
                                  {
                                    
@@ -157,18 +79,18 @@ public:
                                  });
     }
 
-    void broadcastNotify(uint32_t msgType, char*data, int length)
+    void broadcastNotify(uint32_t msgType, const std::string& str)
     {
-         Message rspMsg;
-        rspMsg.length_ = length + Message::package_head_size;
+        Message rspMsg;
+        rspMsg.length_ = str.size() + Message::package_head_size;
         rspMsg.msg_type_ = msgType;
-        for (int i = 0; i < length; ++i)
+        for (int i = 0; i < str.size(); ++i)
         {
-            rspMsg.body_.push_back(data[i]);
+            rspMsg.body_.push_back(str[i]);
         }
-        char* bytes = rspMsg.Convert2Bytes();
-        
-        tempfunc(server_, data, length);
+        std::string sendStr = rspMsg.Convert2Str();
+
+        tempfunc(server_, sendStr);
     }
 
     void cacheReadDatas(const std::size_t length)
@@ -189,31 +111,31 @@ public:
                     char c2 = bytes_buffer_[1];
                     char c3 = bytes_buffer_[2];
                     char c4 = bytes_buffer_[3];
-                    uint32_t length = c4 << 24 | c3 << 16 | c2 << 8 | c1;
+                    uint32_t length = c1 << 24 | c2 << 16 | c3 << 8 | c4;
 
                     c1 = bytes_buffer_[4];
                     c2 = bytes_buffer_[5];
                     c3 = bytes_buffer_[6];
                     c4 = bytes_buffer_[7];
-                    uint32_t msg_type = c4 << 24 | c3 << 16 | c2 << 8 | c1;
+                    uint32_t msg_type = c1 << 24 | c2 << 16 | c3 << 8 | c4;
 
                     c1 = bytes_buffer_[8];
                     c2 = bytes_buffer_[9];
                     c3 = bytes_buffer_[10];
                     c4 = bytes_buffer_[11];
-                    uint32_t sequence = c4 << 24 | c3 << 16 | c2 << 8 | c1;
+                    uint32_t sequence = c1 << 24 | c2 << 16 | c3 << 8 | c4;
 
                     c1 = bytes_buffer_[12];
                     c2 = bytes_buffer_[13];
                     c3 = bytes_buffer_[14];
                     c4 = bytes_buffer_[15];
-                    uint32_t flags = c4 << 24 | c3 << 16 | c2 << 8 | c1;
+                    uint32_t flags = c1 << 24 | c2 << 16 | c3 << 8 | c4;
 
                     c1 = bytes_buffer_[16];
                     c2 = bytes_buffer_[17];
                     c3 = bytes_buffer_[18];
                     c4 = bytes_buffer_[19];
-                    uint32_t reserved = c4 << 24 | c3 << 16 | c2 << 8 | c1;
+                    uint32_t reserved = c1 << 24 | c2 << 16 | c3 << 8 | c4;
 
                     message_.length_ = length - Message::package_head_size;
                     message_.msg_type_ = msg_type;
@@ -254,24 +176,26 @@ public:
 
     void processMessage() 
     {
+        printf("processMessage: %d\n", message_.msg_type_);
         switch (message_.msg_type_)
         {
             case ID_C2L_EnterWorld:
                 C2L_EnterWorld req;
                 req.ParseFromArray(message_.BodyToBytes(), message_.length_);
+
                 L2C_EnterWorld rsp;
                 rsp.set_ret(1);
                 rsp.set_uid(req.uid());
-                char * rspbytes = new char(rsp.ByteSize());
-                rsp.SerializeToArray(rspbytes, rsp.ByteSize());
-                response(ID_L2C_EnterWorld, rspbytes, rsp.ByteSize());
+                std::string serialized_data_rsp;
+                rsp.SerializeToString(&serialized_data_rsp);
+                response(ID_L2C_EnterWorld, serialized_data_rsp);
 
                 L2C_NotifyEnterWorld broadcast;
                 broadcast.set_ret(1);
                 broadcast.set_uid(req.uid());
-                char* broadcastBytes = new char(broadcast.ByteSize());
-                broadcast.SerializeToArray(broadcastBytes, broadcast.ByteSize());
-                broadcastNotify(ID_L2C_NotifyEnterWorld, broadcastBytes, broadcast.ByteSize());
+                std::string serialized_broadcast;
+                broadcast.SerializeToString(&serialized_broadcast);
+                broadcastNotify(ID_L2C_NotifyEnterWorld, serialized_broadcast);
             break;
         }
     }
@@ -286,7 +210,7 @@ public:
     char data_[max_length];
 
     std::vector<char> bytes_buffer_;
-    int status_;
+    int status_ = 0;
     Message message_;
     Server *server_;
 };
@@ -308,6 +232,7 @@ public:
             {
                 if (!ec)
                 {
+                    printf("connect accepted\n");
                     std::shared_ptr<Session> ses = std::make_shared<Session>(std::move(socket));
                     ses->server_ = this;
                     ses->start();
@@ -329,16 +254,25 @@ public:
     std::vector<std::shared_ptr<Session>> sessions_;
 };
 
-void tempfunc(Server *server, char* data, int length)
+void tempfunc(Server* server, const std::string& str)
 {
-    server->broadcastNotify(data, length);
+    server->broadcastNotify(const_cast<char*>(str.c_str()), str.size());
 }
+
+void clientTest();
 
 int main(int argc, char **argv)
 {
-    boost::asio::io_context io_context;
-    Server server(io_context, 12345);
-    io_context.run();
-
+    if (argc == 1)
+    {
+        boost::asio::io_context io_context;
+        Server server(io_context, 12345);
+        io_context.run();
+    }
+    else
+    {
+        clientTest();
+    }
     return 0;
 }
+
