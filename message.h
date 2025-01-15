@@ -4,6 +4,11 @@
 class Message
 {
 public:
+    ~Message()
+    {
+        //body_.clear();
+    }
+
     std::string  Convert2Str()
     {
         std::string str(length_, 0);
@@ -112,6 +117,60 @@ public:
             buf[20 + i] = body_[i];
         }
         return buf;
+    }
+   
+    void Package(std::shared_ptr<std::vector<char>> pack)
+    {
+        char c1 = length_ >> 24;
+        char c2 = length_ >> 16;
+        char c3 = length_ >> 8;
+        char c4 = length_;
+        pack->push_back(c1);
+        pack->push_back(c1);
+        pack->push_back(c2);
+        pack->push_back(c3);
+        pack->push_back(c4);
+
+        c1 = msg_type_ >> 24;
+        c2 = msg_type_ >> 16;
+        c3 = msg_type_ >> 8;
+        c4 = msg_type_;
+        pack->push_back(c1);
+        pack->push_back(c2);
+        pack->push_back(c3);
+        pack->push_back(c4);
+
+        c1 = sequence_ >> 24;
+        c2 = sequence_ >> 16;
+        c3 = sequence_ >> 8;
+        c4 = sequence_;
+        pack->push_back(c1);
+        pack->push_back(c2);
+        pack->push_back(c3);
+        pack->push_back(c4);
+
+        c1 = flags_ >> 24;
+        c2 = flags_ >> 16;
+        c3 = flags_ >> 8;
+        c4 = flags_;
+        pack->push_back(c1);
+        pack->push_back(c2);
+        pack->push_back(c3);
+        pack->push_back(c4);
+
+        c1 = reserved_ >> 24;
+        c2 = reserved_ >> 16;
+        c3 = reserved_ >> 8;
+        c4 = reserved_;
+        pack->push_back(c1);
+        pack->push_back(c2);
+        pack->push_back(c3);
+        pack->push_back(c4);
+
+        for (int i = 0; i < body_.size(); ++i)
+        {
+            pack->push_back(body_[i]);
+        }
     }
 
     char* BodyToBytes()

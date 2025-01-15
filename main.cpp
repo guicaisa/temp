@@ -55,9 +55,10 @@ public:
         Message rspMsg;
         rspMsg.length_ = str.size() + Message::package_head_size;
         rspMsg.msg_type_ = msgType;
+        rspMsg.body_ = std::vector<char>(str.size(), 0);
         for (int i = 0; i < str.size(); ++i)
         {
-            rspMsg.body_.push_back(str[i]);
+            rspMsg.body_[i] = str[i];
         }
         std::string sendStr = rspMsg.Convert2Str();
 
@@ -84,9 +85,10 @@ public:
         Message rspMsg;
         rspMsg.length_ = str.size() + Message::package_head_size;
         rspMsg.msg_type_ = msgType;
+        rspMsg.body_ = std::vector<char>(str.size(), 0);
         for (int i = 0; i < str.size(); ++i)
         {
-            rspMsg.body_.push_back(str[i]);
+            rspMsg.body_[i] = str[i];
         }
         std::string sendStr = rspMsg.Convert2Str();
 
@@ -180,12 +182,14 @@ public:
         switch (message_.msg_type_)
         {
             case ID_C2L_EnterWorld:
+            {
                 C2L_EnterWorld req;
                 req.ParseFromArray(message_.BodyToBytes(), message_.length_);
 
                 L2C_EnterWorld rsp;
                 rsp.set_ret(1);
                 rsp.set_uid(req.uid());
+                rsp.mutable_pos()->CopyFrom(req.pos());
                 std::string serialized_data_rsp;
                 rsp.SerializeToString(&serialized_data_rsp);
                 response(ID_L2C_EnterWorld, serialized_data_rsp);
@@ -193,10 +197,63 @@ public:
                 L2C_NotifyEnterWorld broadcast;
                 broadcast.set_ret(1);
                 broadcast.set_uid(req.uid());
+                broadcast.mutable_pos()->CopyFrom(req.pos());
                 std::string serialized_broadcast;
                 broadcast.SerializeToString(&serialized_broadcast);
                 broadcastNotify(ID_L2C_NotifyEnterWorld, serialized_broadcast);
-            break;
+                break;
+            }
+            
+            case ID_C2L_Move:
+            {
+                C2L_Move cMove;
+                cMove.ParseFromArray(message_.BodyToBytes(), message_.length_);
+
+                L2C_Move sMove;
+                sMove.set_ret(1);
+                sMove.set_uid(cMove.uid());
+                sMove.set_speed(cMove.speed());
+                sMove.mutable_direction()->set_x(cMove.direction().x());
+                sMove.mutable_direction()->set_y(cMove.direction().y());
+                sMove.mutable_direction()->set_z(cMove.direction().z());
+                std::string serialized_data_move;
+                sMove.SerializeToString(&serialized_data_move);
+                response(ID_L2C_Move, serialized_data_move);
+
+                L2C_NotifyMove broadcast_move;
+                broadcast_move.set_ret(1);
+                broadcast_move.set_uid(cMove.uid());
+                broadcast_move.set_speed(cMove.speed());
+                broadcast_move.mutable_direction()->set_x(cMove.direction().x());
+                broadcast_move.mutable_direction()->set_y(cMove.direction().y());
+                broadcast_move.mutable_direction()->set_z(cMove.direction().z());
+                std::string serialized_broadcast_move;
+                broadcast_move.SerializeToString(&serialized_broadcast_move);
+                broadcastNotify(ID_L2C_NotifyMove, serialized_broadcast_move);
+                break;
+            }
+
+            case ID_C2L_StopMove:
+            {
+                C2L_StopMove req;
+                req.ParseFromArray(message_.BodyToBytes(), message_.length_);
+
+                L2C_StopMove rsp;
+                rsp.set_ret(1);
+                rsp.set_uid(req.uid());
+                std::string serialized_data;
+                rsp.SerializeToString(&serialized_data);
+                response(ID_L2C_StopMove, serialized_data);
+
+                L2C_NotifyStopMove broadcast;
+                broadcast.set_ret(1);
+                broadcast.set_uid(req.uid());
+                std::string serialized_broadcast;
+                broadcast.SerializeToString(&serialized_broadcast);
+                broadcastNotify(ID_L2C_NotifyStopMove, serialized_broadcast);
+                break;
+            }
+               
         }
     }
 

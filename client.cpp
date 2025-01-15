@@ -31,26 +31,24 @@ public:
 		});
 	}
 
-    void write(char* data, int length)
-    {
-        boost::asio::async_write(socket_, boost::asio::buffer(data, length),
-            [this](boost::system::error_code ec, std::size_t /*length*/)
-            {
-
-            });
-    }
-
     void sendMsg(uint32_t msgType, const std::string& str)
     {
         Message reqMsg;
         reqMsg.length_ = str.size() + Message::package_head_size;
         reqMsg.msg_type_ = msgType;
+        //reqMsg.body_ = std::vector<char>(str.size(), 0);
         for (int i = 0; i < str.size(); ++i)
         {
             reqMsg.body_.push_back(str[i]);
         }
-        char* bytes = reqMsg.Convert2Bytes();
-        write(bytes, reqMsg.length_);
+        std::string send_str = reqMsg.Convert2Str();
+        auto data = std::make_shared<std::string>(send_str);
+
+        boost::asio::async_write(socket_, boost::asio::buffer(*data),
+            [data](boost::system::error_code ec, std::size_t /*length*/)
+            {
+                //delete[]sendBytes;
+            });
     }
 
 	void cacheReadDatas(const std::size_t length)
@@ -134,12 +132,53 @@ public:
     {
         switch (message_.msg_type_)
         {
-        case ID_L2C_EnterWorld:
-            printf("ID_L2C_EnterWorld\n");
-            break;
-        case ID_L2C_NotifyEnterWorld:
-            printf("ID_L2C_NotifyEnterWorld\n");
-            break;
+            case ID_L2C_EnterWorld:
+            {
+                printf("ID_L2C_EnterWorld\n");
+                L2C_EnterWorld rsp;
+                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                break;
+            }
+            
+            case ID_L2C_NotifyEnterWorld:
+            {
+                printf("ID_L2C_NotifyEnterWorld\n");
+                L2C_NotifyEnterWorld rsp;
+                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                break;
+            }
+
+            case ID_L2C_Move:
+            {
+                printf("ID_L2C_Move\n");
+                L2C_Move rsp;
+                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                break;
+            }
+
+            case ID_L2C_NotifyMove:
+            {
+                printf("ID_L2C_NotifyMove\n");
+                L2C_NotifyMove rsp;
+                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                break;
+            }
+
+            case ID_L2C_StopMove:
+            {
+                printf("ID_L2C_StopMove\n");
+                L2C_StopMove rsp;
+                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                break;
+            }
+
+            case ID_L2C_NotifyStopMove:
+            {
+                printf("ID_L2C_NotifyStopMove\n");
+                L2C_NotifyStopMove rsp;
+                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                break;
+            }
         }
     }
 	
@@ -179,11 +218,43 @@ void clientTest()
         }
         io_context.post([&client = client, num = num]()
             {
-                C2L_EnterWorld req;
-                req.set_uid(123);
-                std::string serialized_data;
-                req.SerializeToString(&serialized_data);
-                client.sendMsg(ID_C2L_EnterWorld, serialized_data);
+                switch (num)
+                {
+                    case ID_C2L_EnterWorld:
+                    {
+                        C2L_EnterWorld req;
+                        req.set_uid(123);
+                        std::string serialized_data;
+                        req.SerializeToString(&serialized_data);
+                        client.sendMsg(ID_C2L_EnterWorld, serialized_data);
+                        break;
+                    }
+
+                    case ID_C2L_Move:
+                    {
+                        C2L_Move req;
+                        req.set_uid(123);
+                        req.set_speed(456);
+                        req.mutable_direction()->set_x(1);
+                        req.mutable_direction()->set_x(2);
+                        req.mutable_direction()->set_x(3);
+                        std::string serialized_data;
+                        req.SerializeToString(&serialized_data);
+                        client.sendMsg(ID_C2L_Move, serialized_data);
+                        break;
+                    }
+
+                    case ID_C2L_StopMove:
+                    {
+                        C2L_StopMove req;
+                        req.set_uid(123);
+                        std::string serialized_data;
+                        req.SerializeToString(&serialized_data);
+                        client.sendMsg(ID_C2L_StopMove, serialized_data);
+                        break;
+                    }
+                }
+                
             });
     }
 
