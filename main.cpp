@@ -184,7 +184,7 @@ public:
             case ID_C2L_EnterWorld:
             {
                 C2L_EnterWorld req;
-                req.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                req.ParseFromString(message_.BodyToString());
 
                 L2C_EnterWorld rsp;
                 rsp.set_ret(1);
@@ -207,7 +207,7 @@ public:
             case ID_C2L_Move:
             {
                 C2L_Move cMove;
-                cMove.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                cMove.ParseFromString(message_.BodyToString());
 
                 L2C_Move sMove;
                 sMove.set_ret(1);
@@ -236,7 +236,7 @@ public:
             case ID_C2L_StopMove:
             {
                 C2L_StopMove req;
-                req.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                req.ParseFromString(message_.BodyToString());
 
                 L2C_StopMove rsp;
                 rsp.set_ret(1);

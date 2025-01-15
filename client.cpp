@@ -136,7 +136,7 @@ public:
             {
                 printf("ID_L2C_EnterWorld\n");
                 L2C_EnterWorld rsp;
-                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                rsp.ParseFromString(message_.BodyToString());
                 break;
             }
             
@@ -144,7 +144,7 @@ public:
             {
                 printf("ID_L2C_NotifyEnterWorld\n");
                 L2C_NotifyEnterWorld rsp;
-                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                rsp.ParseFromString(message_.BodyToString());
                 break;
             }
 
@@ -152,7 +152,7 @@ public:
             {
                 printf("ID_L2C_Move\n");
                 L2C_Move rsp;
-                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                rsp.ParseFromString(message_.BodyToString());
                 break;
             }
 
@@ -160,7 +160,7 @@ public:
             {
                 printf("ID_L2C_NotifyMove\n");
                 L2C_NotifyMove rsp;
-                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                rsp.ParseFromString(message_.BodyToString());
                 break;
             }
 
@@ -168,7 +168,7 @@ public:
             {
                 printf("ID_L2C_StopMove\n");
                 L2C_StopMove rsp;
-                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                rsp.ParseFromString(message_.BodyToString());
                 break;
             }
 
@@ -176,7 +176,7 @@ public:
             {
                 printf("ID_L2C_NotifyStopMove\n");
                 L2C_NotifyStopMove rsp;
-                rsp.ParseFromArray(message_.BodyToBytes(), message_.length_);
+                rsp.ParseFromString(message_.BodyToString());
                 break;
             }
         }
@@ -236,8 +236,8 @@ void clientTest()
                         req.set_uid(123);
                         req.set_speed(456);
                         req.mutable_direction()->set_x(1);
-                        req.mutable_direction()->set_x(2);
-                        req.mutable_direction()->set_x(3);
+                        req.mutable_direction()->set_y(2);
+                        req.mutable_direction()->set_z(3);
                         std::string serialized_data;
                         req.SerializeToString(&serialized_data);
                         client.sendMsg(ID_C2L_Move, serialized_data);

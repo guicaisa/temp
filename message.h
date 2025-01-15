@@ -183,6 +183,16 @@ public:
         return data;
     }
 
+    std::string BodyToString()
+    {
+        std::string str;
+        for (int i = 0; i < body_.size(); ++i)
+        {
+            str += body_[i];
+        }
+        return str;
+    }
+
 public:
     static const uint32_t package_head_size = 20;
 
