@@ -11,6 +11,10 @@ enum MSG_TYPE {
   ID_C2L_StopMove = 7;
   ID_L2C_StopMove = 8;
   ID_L2C_NotifyStopMove = 9;
+  ID_C2L_CreateAccount = 10;
+  ID_L2C_CreateAccount = 11;
+  ID_C2L_Login = 12;
+  ID_L2C_Login = 13;
 }
 
 message Vector3 {
@@ -74,4 +78,30 @@ message L2C_StopMove {
 message L2C_NotifyStopMove {
   uint32 ret = 1;
   uint64 uid = 2;
+}
+
+//创建账号
+message C2L_CreateAccount {
+  string account = 1;
+  string password = 2;
+}
+
+message L2C_CreateAccount {
+  uint32 ret = 1;
+  string account = 2;
+  string password = 3;
+  uint64 uid = 4;
+}
+
+//登录
+message C2L_Login {
+  string account = 1;
+  string password = 2;
+}
+
+message L2C_Login {
+  uint32 ret = 1;
+  string account = 2;
+  string password = 3;
+  uint64 uid = 4;
 }

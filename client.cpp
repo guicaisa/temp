@@ -153,6 +153,7 @@ public:
                 printf("ID_L2C_Move\n");
                 L2C_Move rsp;
                 rsp.ParseFromString(message_.BodyToString());
+                printf("uid: %d, x: %f, y: %f, z: %f\n", rsp.uid(), rsp.direction().x(), rsp.direction().y(), rsp.direction().z());
                 break;
             }
 
@@ -161,6 +162,7 @@ public:
                 printf("ID_L2C_NotifyMove\n");
                 L2C_NotifyMove rsp;
                 rsp.ParseFromString(message_.BodyToString());
+                printf("uid: %d, x: %f, y: %f, z: %f\n", rsp.uid(), rsp.direction().x(), rsp.direction().y(), rsp.direction().z());
                 break;
             }
 
@@ -179,6 +181,24 @@ public:
                 rsp.ParseFromString(message_.BodyToString());
                 break;
             }
+
+            case ID_L2C_CreateAccount:
+            {
+                printf("ID_L2C_CreateAccount\n");
+                L2C_CreateAccount rsp;
+                rsp.ParseFromString(message_.BodyToString());
+                printf("account: %s, password: %s, uid: %d\n", rsp.account().c_str(), rsp.password().c_str(), rsp.uid());
+                break;
+            }
+
+            case ID_L2C_Login:
+            {
+                printf("ID_L2C_Login\n");
+                L2C_Login rsp;
+                rsp.ParseFromString(message_.BodyToString());
+                printf("account: %s, password: %s, uid: %d\n", rsp.account().c_str(), rsp.password().c_str(), rsp.uid());
+                break;
+            }
         }
     }
 	
@@ -195,7 +215,7 @@ private:
 	tcp::socket socket_;
 };
 
-void clientTest()
+void clientTest(int uid)
 {
 	boost::asio::io_context io_context;
 	std::string ip = "127.0.0.1";
@@ -216,14 +236,14 @@ void clientTest()
         {
             break;
         }
-        io_context.post([&client = client, num = num]()
+        io_context.post([&client = client, num = num, uid = uid]()
             {
                 switch (num)
                 {
                     case ID_C2L_EnterWorld:
                     {
                         C2L_EnterWorld req;
-                        req.set_uid(123);
+                        req.set_uid(uid);
                         std::string serialized_data;
                         req.SerializeToString(&serialized_data);
                         client.sendMsg(ID_C2L_EnterWorld, serialized_data);
@@ -233,11 +253,11 @@ void clientTest()
                     case ID_C2L_Move:
                     {
                         C2L_Move req;
-                        req.set_uid(123);
+                        req.set_uid(uid);
                         req.set_speed(456);
-                        req.mutable_direction()->set_x(1);
-                        req.mutable_direction()->set_y(2);
-                        req.mutable_direction()->set_z(3);
+                        req.mutable_direction()->set_x(111.1);
+                        req.mutable_direction()->set_y(22.1);
+                        req.mutable_direction()->set_z(43333.5);
                         std::string serialized_data;
                         req.SerializeToString(&serialized_data);
                         client.sendMsg(ID_C2L_Move, serialized_data);
@@ -247,10 +267,32 @@ void clientTest()
                     case ID_C2L_StopMove:
                     {
                         C2L_StopMove req;
-                        req.set_uid(123);
+                        req.set_uid(uid);
                         std::string serialized_data;
                         req.SerializeToString(&serialized_data);
                         client.sendMsg(ID_C2L_StopMove, serialized_data);
+                        break;
+                    }
+
+                    case ID_C2L_CreateAccount:
+                    {
+                        C2L_CreateAccount req;
+                        req.set_account("guicaisa");
+                        req.set_password("443322");
+                        std::string serialized_data;
+                        req.SerializeToString(&serialized_data);
+                        client.sendMsg(ID_C2L_CreateAccount, serialized_data);
+                        break;
+                    }
+
+                    case ID_C2L_Login:
+                    {
+                        C2L_Login req;
+                        req.set_account("guicaisa");
+                        req.set_password("443322");
+                        std::string serialized_data;
+                        req.SerializeToString(&serialized_data);
+                        client.sendMsg(ID_C2L_Login, serialized_data);
                         break;
                     }
                 }

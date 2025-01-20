@@ -4,12 +4,15 @@
 #include "player.pb.h"
 #include "cl.pb.h"
 #include "message.h"
+#include <mysql/mysql.h>
 
 using boost::asio::ip::tcp;
 
 class Server;
-void tempfunc(Server *server, const std::string& str);
 
+void tempfunc(Server *server, const std::string& str);
+int tempCreateAccount(Server* server, const std::string& account, const std::string& password, uint64_t* uid);
+int tempLogin(Server* server, const std::string& account, const std::string& password, uint64_t* uid);
 
 class Session : public std::enable_shared_from_this<Session>
 {
@@ -185,6 +188,7 @@ public:
             {
                 C2L_EnterWorld req;
                 req.ParseFromString(message_.BodyToString());
+                printf("C2L_EnterWorld: uid: %d, pos: x: %f, y: %f, z: %f\n", req.uid(), req.pos().x(), req.pos().y(), req.pos().z());
 
                 L2C_EnterWorld rsp;
                 rsp.set_ret(1);
@@ -208,6 +212,8 @@ public:
             {
                 C2L_Move cMove;
                 cMove.ParseFromString(message_.BodyToString());
+                printf("C2L_Move: uid: %d, speed: %f, pos: x: %f, y: %f, z: %f\n", cMove.uid(), cMove.speed(), cMove.direction().x(), cMove.direction().y(), cMove.direction().z());
+
 
                 L2C_Move sMove;
                 sMove.set_ret(1);
@@ -237,6 +243,7 @@ public:
             {
                 C2L_StopMove req;
                 req.ParseFromString(message_.BodyToString());
+                printf("C2L_StopMove: uid: %d\n", req.uid());
 
                 L2C_StopMove rsp;
                 rsp.set_ret(1);
@@ -253,11 +260,46 @@ public:
                 broadcastNotify(ID_L2C_NotifyStopMove, serialized_broadcast);
                 break;
             }
-               
+
+            case ID_C2L_CreateAccount:
+            {
+                C2L_CreateAccount req;
+                req.ParseFromString(message_.BodyToString());
+                printf("C2L_CreateAccount: account: %s, password: %s\n", req.account().c_str(), req.password().c_str());
+
+                uint64_t uid = 0;
+                int ret = tempCreateAccount(server_, req.account(), req.password(), &uid);
+                L2C_CreateAccount rsp;
+                rsp.set_ret(ret);
+                rsp.set_account(req.account());
+                rsp.set_password(req.password());
+                rsp.set_uid(uid);
+                std::string serialized_data;
+                rsp.SerializeToString(&serialized_data);
+                response(ID_L2C_CreateAccount, serialized_data);
+                break;
+            }
+
+            case ID_C2L_Login:
+            {
+                C2L_Login req;
+                 req.ParseFromString(message_.BodyToString());
+                printf("C2L_Login: account: %s, password: %s\n", req.account().c_str(), req.password().c_str());
+
+                uint64_t uid = 0;
+                int ret = tempLogin(server_, req.account(), req.password(), &uid);
+                L2C_Login rsp;
+                rsp.set_ret(ret);
+                rsp.set_account(req.account());
+                rsp.set_password(req.password());
+                rsp.set_uid(uid);
+                std::string serialized_data;
+                rsp.SerializeToString(&serialized_data);
+                response(ID_L2C_Login, serialized_data);
+                break;
+            }
         }
     }
-
-    
 
     tcp::socket socket_;
     enum
@@ -278,6 +320,17 @@ public:
     Server(boost::asio::io_context &io_context, short port)
         : acceptor_(io_context, tcp::endpoint(tcp::v4(), port))
     {
+        conn_ = mysql_init(NULL);
+        if (conn_ == NULL) {
+            fprintf(stderr, "mysql_init() failed\n");
+        }
+
+        // 连接到 MySQL 数据库
+        if (mysql_real_connect(conn_, "127.0.0.1", "ciao", "123456", "testdb", 3306, NULL, 0) == NULL) {
+            fprintf(stderr, "mysql_real_connect() failed, %s\n", mysql_errno(conn_));
+            mysql_close(conn_);
+        }
+
         do_accept();
     }
 
@@ -307,8 +360,54 @@ public:
         }
     }
 
+    int createAccount(const std::string& account, const std::string& password, uint64_t* uid)
+    {
+        std::string query = "INSERT INTO account (account, password) VALUES ('" + account + "', '" + password + "')";
+        if (mysql_query(conn_, query.c_str())) {
+            fprintf(stderr, "INSERT INTO account failed. Error: %s\n", mysql_error(conn_));
+            mysql_close(conn_);
+            return 123;
+        }
+
+       *uid = mysql_insert_id(conn_);
+
+        return 1;
+    }
+
+    int login(const std::string& account, const std::string& password, uint64_t* uid)
+    {
+        std::string query= "select id from account where account = '" + account + "' and password = '" + password + "'";
+        if (mysql_query(conn_, query.c_str())) {
+            fprintf(stderr, "select from account failed. Error: %s\n", mysql_error(conn_));
+            mysql_close(conn_);
+            return 123;
+        }
+
+        MYSQL_RES* res = mysql_store_result(conn_);
+        if (res == NULL) 
+        {
+            fprintf(stderr, "mysql_store_result() failed. Error: %s\n", mysql_error(conn_));
+            mysql_close(conn_);
+            return 123;
+        }
+
+        MYSQL_ROW row;
+        int num_fields = mysql_num_fields(res);
+        while ((row = mysql_fetch_row(res))) 
+        {
+            for (int i = 0; i < num_fields; i++) 
+            {
+                *uid = atoi(row[i]);
+            }
+        }
+
+        mysql_free_result(res);
+        return 1;
+    }
+
     tcp::acceptor acceptor_;
     std::vector<std::shared_ptr<Session>> sessions_;
+    MYSQL* conn_;
 };
 
 void tempfunc(Server* server, const std::string& str)
@@ -316,7 +415,17 @@ void tempfunc(Server* server, const std::string& str)
     server->broadcastNotify(const_cast<char*>(str.c_str()), str.size());
 }
 
-void clientTest();
+int tempCreateAccount(Server* server, const std::string& account, const std::string& password, uint64_t* uid)
+{
+    return server->createAccount(account, password, uid);
+}
+
+int tempLogin(Server* server, const std::string& account, const std::string& password, uint64_t* uid)
+{
+    return server->login(account, password, uid);
+}
+
+void clientTest(int uid);
 
 int main(int argc, char **argv)
 {
@@ -328,7 +437,8 @@ int main(int argc, char **argv)
     }
     else
     {
-        clientTest();
+        int uid = atoi(argv[1]);
+        clientTest(uid);
     }
     return 0;
 }

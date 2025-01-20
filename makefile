@@ -8,10 +8,10 @@ INCLUDE_DIRS = -I/usr/include -I/home/ciao/protobuf/include
 
 
 # 链接器选项
-LDFLAGS = -L/usr/lib/x86_64-linux-gnu -lboost_system -L/home/ciao/protobuf/lib -lprotobuf
+LDFLAGS = -L/usr/lib/x86_64-linux-gnu -lboost_system -L/home/ciao/protobuf/lib -lprotobuf -lmysqlclient
 
 # 源文件和目标文件
-SRC = main.cpp player.pb.cpp cl.pb.cpp
+SRC = main.cpp player.pb.cpp cl.pb.cpp client.cpp
 OBJ = $(SRC:.cpp=.o)
 
 # 输出的可执行文件
