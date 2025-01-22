@@ -4,6 +4,7 @@
 #include "message.h"
 #include "cl.pb.h"
 #include <iostream>
+#include <cstdio>
 
 using boost::asio::ip::tcp;
 
@@ -118,7 +119,10 @@ public:
 
                     processMessage();
                 }
-                break_loop = true;
+                else
+                {
+                    break_loop = true;
+                }
                 break;
             }
             if (break_loop)
@@ -199,7 +203,36 @@ public:
                 printf("account: %s, password: %s, uid: %d\n", rsp.account().c_str(), rsp.password().c_str(), rsp.uid());
                 break;
             }
+
+            case ID_L2C_LeaveWorld:
+            {
+                printf("ID_L2C_LeaveWorld\n");
+                L2C_LeaveWorld rsp;
+                rsp.ParseFromString(message_.BodyToString());
+                printf("uid: %d\n", rsp.uid());
+                break;
+            }
+
+            case ID_L2C_NotifyLeaveWorld:
+            {
+                printf("ID_L2C_NotifyLeaveWorld\n");
+                L2C_NotifyLeaveWorld rsp;
+                rsp.ParseFromString(message_.BodyToString());
+                printf("uid: %d\n", rsp.uid());
+                break;
+            }
+
+            case ID_L2C_NotifyPlayeStates:
+            {
+               // printf("ID_L2C_NotifyPlayeStates\n");
+                L2C_NotifyPlayeStates rsp;
+                rsp.ParseFromString(message_.BodyToString());
+                //printf("%s\n", rsp.DebugString().c_str());
+                break;
+            }
         }
+
+        std::fflush(stdout);
     }
 	
 private:
@@ -293,6 +326,16 @@ void clientTest(int uid)
                         std::string serialized_data;
                         req.SerializeToString(&serialized_data);
                         client.sendMsg(ID_C2L_Login, serialized_data);
+                        break;
+                    }
+
+                    case ID_C2L_LeaveWorld:
+                    {
+                        C2L_LeaveWorld req;
+                        req.set_uid(uid);
+                        std::string serialized_data;
+                        req.SerializeToString(&serialized_data);
+                        client.sendMsg(ID_C2L_LeaveWorld, serialized_data);
                         break;
                     }
                 }

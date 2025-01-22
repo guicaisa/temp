@@ -2,19 +2,23 @@ syntax = "proto3";
 
 enum MSG_TYPE {
   ID_NONE = 0;
-  ID_C2L_EnterWorld = 1;
+  ID_C2L_EnterWorld = 1; //进入世界
   ID_L2C_EnterWorld = 2;
-  ID_L2C_NotifyEnterWorld = 3;
-  ID_C2L_Move = 4;
+  ID_L2C_NotifyEnterWorld = 3; //通知进入世界
+  ID_C2L_Move = 4; //移动
   ID_L2C_Move = 5;
-  ID_L2C_NotifyMove = 6;
-  ID_C2L_StopMove = 7;
+  ID_L2C_NotifyMove = 6; //通知移动
+  ID_C2L_StopMove = 7; //停止移动
   ID_L2C_StopMove = 8;
-  ID_L2C_NotifyStopMove = 9;
-  ID_C2L_CreateAccount = 10;
+  ID_L2C_NotifyStopMove = 9; //通知停止移动
+  ID_C2L_CreateAccount = 10; //创建账号
   ID_L2C_CreateAccount = 11;
-  ID_C2L_Login = 12;
+  ID_C2L_Login = 12; //登录
   ID_L2C_Login = 13;
+  ID_C2L_LeaveWorld = 14; //离开世界
+  ID_L2C_LeaveWorld = 15;
+  ID_L2C_NotifyLeaveWorld = 16; //通知离开世界
+  ID_L2C_NotifyPlayeStates = 17; //通知世界内所有玩家状态
 }
 
 message Vector3 {
@@ -47,6 +51,7 @@ message C2L_Move {
   uint64 uid = 1;
   Vector3 direction = 2;
   float speed = 3;
+  Vector3 pos = 4;
 }
 
 message L2C_Move {
@@ -54,6 +59,7 @@ message L2C_Move {
   uint64 uid = 2;
   Vector3 direction = 3;
   float speed = 4;
+  Vector3 pos = 5;
 }
 
 //通知其他玩家移动
@@ -62,6 +68,7 @@ message L2C_NotifyMove {
   uint64 uid = 2;
   Vector3 direction = 3;
   float speed = 4;
+  Vector3 pos = 5;
 }
 
 //停止移动
@@ -104,4 +111,35 @@ message L2C_Login {
   string account = 2;
   string password = 3;
   uint64 uid = 4;
+}
+
+//离开世界
+message C2L_LeaveWorld {
+  uint64 uid = 1;
+}
+
+message L2C_LeaveWorld {
+  uint32 ret = 1;
+  uint64 uid = 2;
+}
+
+//通知离开世界
+message L2C_NotifyLeaveWorld {
+  uint32 ret = 1;
+  uint64 uid = 2;
+}
+
+//玩家状态
+message PlayerState {
+  uint64 uid = 1;
+  Vector3 pos = 2;
+  Vector3 direction = 3;
+  float speed = 4;
+  bool is_move = 5; //是否正在移动中
+}
+
+//通知世界内所有玩家状态
+message L2C_NotifyPlayeStates {
+  uint32 ret = 1;
+  repeated PlayerState player_states = 2;
 }

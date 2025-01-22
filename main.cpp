@@ -4,25 +4,62 @@
 #include "player.pb.h"
 #include "cl.pb.h"
 #include "message.h"
+#ifdef WIN32
+#include "mysql.h"
+#else
 #include <mysql/mysql.h>
+#endif
 
 using boost::asio::ip::tcp;
 
 class Server;
 
-void tempfunc(Server *server, const std::string& str);
+void tempfunc(Server *server, uint32_t msg_type, const std::string& str);
 int tempCreateAccount(Server* server, const std::string& account, const std::string& password, uint64_t* uid);
 int tempLogin(Server* server, const std::string& account, const std::string& password, uint64_t* uid);
+std::vector<PlayerState> tempGetPlayerStates(Server* server);
+
 
 class Session : public std::enable_shared_from_this<Session>
 {
 public:
-    explicit Session(tcp::socket socket) : socket_(std::move(socket)) {}
+    explicit Session(tcp::socket socket) : socket_(std::move(socket)) 
+    {
+        uid_ = 0;
+        speed_ = 0.0f;
+        is_move_ = false;
+        is_in_world_ = false;
+        pos_.set_x(0);
+        pos_.set_y(0);
+        pos_.set_z(0);
+        direciton_.set_x(0);
+        direciton_.set_y(0);
+        direciton_.set_z(0);
+    }
 
     void start()
     {
         do_read();
     }
+
+    void update()
+    {
+        if (!is_in_world_ || !is_move_)
+        {
+            return;
+        }
+    }
+
+    bool isInWorld()
+    {
+        return is_in_world_;
+    }
+
+    uint64_t uid() { return uid_; }
+    const Vector3& pos() { return pos_; }
+    const Vector3& direction() { return direciton_; }
+    float speed() { return speed_; }
+    bool isMove() { return is_move_; }
 
 public:
     void do_read()
@@ -67,19 +104,33 @@ public:
 
         auto self(shared_from_this());
         boost::asio::async_write(socket_, boost::asio::buffer(sendStr.c_str(), sendStr.size()),
-                                 [this, self](boost::system::error_code ec, std::size_t /*length*/)
+                                 [this, self, msgType = msgType](boost::system::error_code ec, std::size_t /*length*/)
                                  {
-                                   
+                                    if (!ec)
+                                    {
+                                        printf("write %d success\n", msgType);
+                                    }
+                                    else 
+                                    {
+                                        printf("write %d error\n", msgType);
+                                    }
                                  });
     }
 
-    void write(char*data, int length)
+    void write(uint32_t msg_type, const std::string str)
     {
         auto self(shared_from_this());
-        boost::asio::async_write(socket_, boost::asio::buffer(data, length),
-                                 [this, self](boost::system::error_code ec, std::size_t /*length*/)
+        boost::asio::async_write(socket_, boost::asio::buffer(str.c_str(), str.size()),
+                                 [this, self, msgType = msg_type](boost::system::error_code ec, std::size_t /*length*/)
                                  {
-                                   
+                                    if (!ec)
+                                    {
+                                        printf("write %d success\n", msgType);
+                                    }
+                                    else
+                                    {
+                                        printf("write %d error\n", msgType);
+                                    }
                                  });
     }
 
@@ -95,7 +146,7 @@ public:
         }
         std::string sendStr = rspMsg.Convert2Str();
 
-        tempfunc(server_, sendStr);
+        tempfunc(server_, msgType, sendStr);
     }
 
     void cacheReadDatas(const std::size_t length)
@@ -169,7 +220,10 @@ public:
                     // printf("player: id: %d, name: %s, score: %d\n", player.id(), player.name().c_str(), player.score());
                     // int a = player.id();
                 }
-                break_loop = true;
+                else
+                {
+                    break_loop = true;
+                }
                 break;
             }
             if (break_loop)
@@ -205,6 +259,25 @@ public:
                 std::string serialized_broadcast;
                 broadcast.SerializeToString(&serialized_broadcast);
                 broadcastNotify(ID_L2C_NotifyEnterWorld, serialized_broadcast);
+
+                pos_.set_x(req.pos().x());
+                pos_.set_y(req.pos().y());
+                pos_.set_z(req.pos().z());
+                is_in_world_ = true;
+
+                std::vector<PlayerState> states = tempGetPlayerStates(server_);
+                if (states.size() != 0)
+                {
+                    L2C_NotifyPlayeStates n_player_state;
+                    for (int i = 0; i < states.size(); ++i)
+                    {
+                        PlayerState* temp = n_player_state.add_player_states();
+                        *temp = states[i];
+                    }
+                    std::string serialized_notify;
+                    n_player_state.SerializeToString(&serialized_notify);
+                    response(ID_L2C_NotifyPlayeStates, serialized_notify);
+                }
                 break;
             }
             
@@ -222,6 +295,9 @@ public:
                 sMove.mutable_direction()->set_x(cMove.direction().x());
                 sMove.mutable_direction()->set_y(cMove.direction().y());
                 sMove.mutable_direction()->set_z(cMove.direction().z());
+                sMove.mutable_pos()->set_x(cMove.pos().x());
+                sMove.mutable_pos()->set_y(cMove.pos().y());
+                sMove.mutable_pos()->set_z(cMove.pos().z());
                 std::string serialized_data_move;
                 sMove.SerializeToString(&serialized_data_move);
                 response(ID_L2C_Move, serialized_data_move);
@@ -233,9 +309,21 @@ public:
                 broadcast_move.mutable_direction()->set_x(cMove.direction().x());
                 broadcast_move.mutable_direction()->set_y(cMove.direction().y());
                 broadcast_move.mutable_direction()->set_z(cMove.direction().z());
+                broadcast_move.mutable_pos()->set_x(cMove.pos().x());
+                broadcast_move.mutable_pos()->set_y(cMove.pos().y());
+                broadcast_move.mutable_pos()->set_z(cMove.pos().z());
                 std::string serialized_broadcast_move;
                 broadcast_move.SerializeToString(&serialized_broadcast_move);
                 broadcastNotify(ID_L2C_NotifyMove, serialized_broadcast_move);
+
+                is_move_ = true;
+                speed_ = cMove.speed();
+                direciton_.set_x(cMove.direction().x());
+                direciton_.set_y(cMove.direction().y());
+                direciton_.set_z(cMove.direction().z());
+                pos_.set_x(cMove.pos().x());
+                pos_.set_y(cMove.pos().y());
+                pos_.set_z(cMove.pos().z());
                 break;
             }
 
@@ -258,6 +346,8 @@ public:
                 std::string serialized_broadcast;
                 broadcast.SerializeToString(&serialized_broadcast);
                 broadcastNotify(ID_L2C_NotifyStopMove, serialized_broadcast);
+
+                is_move_ = false;
                 break;
             }
 
@@ -283,19 +373,52 @@ public:
             case ID_C2L_Login:
             {
                 C2L_Login req;
-                 req.ParseFromString(message_.BodyToString());
+                req.ParseFromString(message_.BodyToString());
                 printf("C2L_Login: account: %s, password: %s\n", req.account().c_str(), req.password().c_str());
 
-                uint64_t uid = 0;
-                int ret = tempLogin(server_, req.account(), req.password(), &uid);
                 L2C_Login rsp;
-                rsp.set_ret(ret);
                 rsp.set_account(req.account());
                 rsp.set_password(req.password());
-                rsp.set_uid(uid);
+                if (uid_ != 0)
+                {
+                    rsp.set_ret(1);
+                    rsp.set_uid(uid_);
+                }
+                else
+                {
+                    uint64_t uid = 0;
+                    int ret = tempLogin(server_, req.account(), req.password(), &uid);
+                    rsp.set_ret(ret);
+                    rsp.set_uid(uid);
+                }
                 std::string serialized_data;
                 rsp.SerializeToString(&serialized_data);
                 response(ID_L2C_Login, serialized_data);
+                break;
+            }
+
+            case ID_C2L_LeaveWorld:
+            {
+                C2L_LeaveWorld req;
+                req.ParseFromString(message_.BodyToString());
+                printf("C2L_LeaveWorld: uid: %ld\n", req.uid());
+
+                L2C_LeaveWorld rsp;
+                rsp.set_ret(1);
+                rsp.set_uid(req.uid());
+                std::string serialized_data;
+                rsp.SerializeToString(&serialized_data);
+                response(ID_L2C_LeaveWorld, serialized_data);
+
+                L2C_NotifyLeaveWorld broadcast;
+                broadcast.set_ret(1);
+                broadcast.set_uid(req.uid());
+                std::string serialized_broadcast;
+                broadcast.SerializeToString(&serialized_broadcast);
+                broadcastNotify(ID_L2C_NotifyLeaveWorld, serialized_broadcast);
+
+                is_move_ = false;
+                is_in_world_ = false;
                 break;
             }
         }
@@ -312,14 +435,22 @@ public:
     int status_ = 0;
     Message message_;
     Server *server_;
+
+    uint64_t uid_;
+    Vector3 pos_;
+    Vector3 direciton_;
+    float speed_;
+    bool is_move_;
+    bool is_in_world_;
 };
 
 class Server
 {
 public:
     Server(boost::asio::io_context &io_context, short port)
-        : acceptor_(io_context, tcp::endpoint(tcp::v4(), port))
+        : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)), timer_(io_context, boost::asio::chrono::seconds(1))
     {
+        count_ = 0;
         conn_ = mysql_init(NULL);
         if (conn_ == NULL) {
             fprintf(stderr, "mysql_init() failed\n");
@@ -332,6 +463,7 @@ public:
         }
 
         do_accept();
+        do_timer();
     }
 
 public:
@@ -352,11 +484,61 @@ public:
             });
     }
 
-    void broadcastNotify(char* data, int length) 
+    void do_timer()
+    {
+        timer_.async_wait([&](const boost::system::error_code& ec) {
+            if (!ec)
+            {
+                update();
+                timer_.expires_after(boost::asio::chrono::seconds(1));  
+                do_timer();
+            }
+            });
+    }
+
+    void update()
+    {
+        //printf("server update %d\n", count_);
+        ++count_;
+        if (sessions_.size() == 0)
+        {
+            return;
+        }
+        for (int i = 0; i < sessions_.size(); ++i)
+        {
+            sessions_[i]->update();
+        }
+        std::vector<PlayerState> states = getPlayerStates();
+        if (states.size() == 0)
+        {
+            return;
+        }
+        L2C_NotifyPlayeStates n_player_state;
+        for (int i = 0; i < states.size(); ++i)
+        {
+            PlayerState* temp = n_player_state.add_player_states();
+            *temp = states[i];
+        }
+        std::string serialized_notify;
+        n_player_state.SerializeToString(&serialized_notify);
+
+        Message rspMsg;
+        rspMsg.length_ = serialized_notify.size() + Message::package_head_size;
+        rspMsg.msg_type_ = ID_L2C_NotifyPlayeStates;
+        rspMsg.body_ = std::vector<char>(serialized_notify.size(), 0);
+        for (int i = 0; i < serialized_notify.size(); ++i)
+        {
+            rspMsg.body_[i] = serialized_notify[i];
+        }
+        std::string sendStr = rspMsg.Convert2Str();
+        broadcastNotify(rspMsg.msg_type_, sendStr);
+    }
+
+    void broadcastNotify(uint32_t msg_type, const std::string str) 
     {
         for (int i = 0; i < sessions_.size(); ++i)
         {
-            sessions_[i]->write(data, length);
+            sessions_[i]->write(msg_type, str);
         }
     }
 
@@ -405,14 +587,40 @@ public:
         return 1;
     }
 
+    std::vector<PlayerState> getPlayerStates()
+    {
+        std::vector<PlayerState> player_states;
+        for (int i = 0; i < sessions_.size(); ++i)
+        {
+            std::shared_ptr<Session> ses = sessions_[i];
+            if (ses->isInWorld())
+            {
+                PlayerState state;
+                state.set_uid(ses->uid());
+                state.set_speed(ses->speed());
+                state.set_is_move(ses->isMove());
+                state.mutable_pos()->set_x(ses->pos().x());
+                state.mutable_pos()->set_y(ses->pos().y());
+                state.mutable_pos()->set_z(ses->pos().z());
+                state.mutable_direction()->set_x(ses->direction().x());
+                state.mutable_direction()->set_y(ses->direction().y());
+                state.mutable_direction()->set_z(ses->direction().z());
+                player_states.push_back(state);
+            }
+        }
+        return player_states;
+    }
+
     tcp::acceptor acceptor_;
     std::vector<std::shared_ptr<Session>> sessions_;
     MYSQL* conn_;
+    boost::asio::steady_timer timer_;
+    int count_;
 };
 
-void tempfunc(Server* server, const std::string& str)
+void tempfunc(Server* server, uint32_t msg_type, const std::string& str)
 {
-    server->broadcastNotify(const_cast<char*>(str.c_str()), str.size());
+    server->broadcastNotify(msg_type, str);
 }
 
 int tempCreateAccount(Server* server, const std::string& account, const std::string& password, uint64_t* uid)
@@ -425,7 +633,13 @@ int tempLogin(Server* server, const std::string& account, const std::string& pas
     return server->login(account, password, uid);
 }
 
+std::vector<PlayerState> tempGetPlayerStates(Server* server)
+{
+    return server->getPlayerStates();
+}
+
 void clientTest(int uid);
+
 
 int main(int argc, char **argv)
 {
