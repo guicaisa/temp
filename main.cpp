@@ -13,11 +13,13 @@
 using boost::asio::ip::tcp;
 
 class Server;
+class Session;
 
 void tempfunc(Server *server, uint32_t msg_type, const std::string& str);
 int tempCreateAccount(Server* server, const std::string& account, const std::string& password, uint64_t* uid);
 int tempLogin(Server* server, const std::string& account, const std::string& password, uint64_t* uid);
 std::vector<PlayerState> tempGetPlayerStates(Server* server);
+void delSesison(Server* server, Session* ses);
 
 
 class Session : public std::enable_shared_from_this<Session>
@@ -74,6 +76,12 @@ public:
                                         //do_write(length);
                                         cacheReadDatas(length);
                                         do_read();
+                                    }
+                                    else
+                                    {
+                                        is_move_ = false;
+                                        is_in_world_ = false;
+                                        delSesison(server_, this);
                                     }
                                 });
     }
@@ -390,6 +398,7 @@ public:
                     int ret = tempLogin(server_, req.account(), req.password(), &uid);
                     rsp.set_ret(ret);
                     rsp.set_uid(uid);
+                    uid_ = uid;
                 }
                 std::string serialized_data;
                 rsp.SerializeToString(&serialized_data);
@@ -611,6 +620,17 @@ public:
         return player_states;
     }
 
+    void delSesison(Session* ses)
+    {
+        for (int i = 0; i < sessions_.size(); ++i)
+        {
+            if (sessions_[i].get() == ses)
+            {
+                sessions_.erase(sessions_.begin() + i);
+            }
+        }
+    }
+
     tcp::acceptor acceptor_;
     std::vector<std::shared_ptr<Session>> sessions_;
     MYSQL* conn_;
@@ -636,6 +656,11 @@ int tempLogin(Server* server, const std::string& account, const std::string& pas
 std::vector<PlayerState> tempGetPlayerStates(Server* server)
 {
     return server->getPlayerStates();
+}
+
+void delSesison(Server* server, Session* ses)
+{
+    server->delSesison(ses);
 }
 
 void clientTest(int uid);

@@ -224,16 +224,18 @@ public:
 
             case ID_L2C_NotifyPlayeStates:
             {
-               // printf("ID_L2C_NotifyPlayeStates\n");
+                printf("ID_L2C_NotifyPlayeStates\n");
                 L2C_NotifyPlayeStates rsp;
                 rsp.ParseFromString(message_.BodyToString());
-                //printf("%s\n", rsp.DebugString().c_str());
+                printf("%s\n", rsp.DebugString().c_str());
                 break;
             }
         }
 
         std::fflush(stdout);
     }
+
+    int uid_;
 	
 private:
 	enum
@@ -310,7 +312,8 @@ void clientTest(int uid)
                     case ID_C2L_CreateAccount:
                     {
                         C2L_CreateAccount req;
-                        req.set_account("guicaisa");
+                        std::string uid_str = std::to_string(uid);
+                        req.set_account(uid_str);
                         req.set_password("443322");
                         std::string serialized_data;
                         req.SerializeToString(&serialized_data);
@@ -321,7 +324,8 @@ void clientTest(int uid)
                     case ID_C2L_Login:
                     {
                         C2L_Login req;
-                        req.set_account("guicaisa");
+                        std::string uid_str = std::to_string(uid);
+                        req.set_account(uid_str);
                         req.set_password("443322");
                         std::string serialized_data;
                         req.SerializeToString(&serialized_data);
